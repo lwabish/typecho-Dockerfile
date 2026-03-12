@@ -16,7 +16,7 @@ EOF
 fi
 
 os=("debian" "alpine")
-php=("7.3" "7.4" "8.0")
+php=("7.4" "8.2")
 platform=("php" "cli" "fpm" "apache")
 
 for o in ${os[@]}
@@ -26,8 +26,8 @@ do
         last=""
         for f in ${platform[@]}
         do
-            id="build_${p//./}_${f}_${o}"
-            concurrency="build_${o}_${p//./}"
+            id="image_${p//./}_${f}_${o}"
+            concurrency="image_${o}_${p//./}"
             needs=""
 
             if [[ ${last} != "" && $1 = "" ]]; then
@@ -44,17 +44,17 @@ EOF)
                     cat <<EOF
   ${id}:
     concurrency: ${concurrency}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 ${needs}
     steps:
-      - name: Checkout the repo 
-        uses: actions/checkout@v2 
+      - name: Checkout the repo
+        uses: actions/checkout@v4
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
-        uses: docker/login-action@v1 
+        uses: docker/login-action@v3
         with:
           username: \${{ secrets.DOCKERHUB_USERNAME }}
           password: \${{ secrets.DOCKERHUB_TOKEN }}
@@ -62,8 +62,10 @@ ${needs}
         id: generate
         run: |
           ./build.sh -g -v \${{ github.event.inputs.version }} -p ${p} -o ${o} ${f}
+        env:
+          dockerhub_username: \${{ secrets.DOCKERHUB_USERNAME }}
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: \${{ steps.generate.outputs.PLATFORM }}
@@ -73,6 +75,7 @@ ${needs}
             TAG=\${{ steps.generate.outputs.TAG }}
             URL=\${{ steps.generate.outputs.URL }}
             CONFIG=\${{ steps.generate.outputs.CONFIG }}
+            PHP_EXTENSION=\${{ steps.generate.outputs.PHP_EXTENSION }}
             PHP8_SOCKETS_WORKAROUND=\${{ steps.generate.outputs.PHP8_SOCKETS_WORKAROUND }}
 EOF
                 else
